@@ -70,27 +70,25 @@
 	NSString *version = [infoDictionary objectForKey:@"CFBundleVersion"];
 
 	self.title = [NSString stringWithFormat:@"%@ v%@", name, version];
-
-	CGSize viewSize = self.view.bounds.size;
-
-	CGRect labelRect = CGRectMake(0.0f, 0.0f, 80.0f, 32.0f);
-
-	UILabel *tapLabel = [[UILabel alloc] initWithFrame:labelRect];
-
-	tapLabel.text = @"Tap";
-	tapLabel.textColor = [UIColor whiteColor];
-	tapLabel.textAlignment = NSTextAlignmentCenter;
-	tapLabel.backgroundColor = [UIColor clearColor];
-	tapLabel.font = [UIFont systemFontOfSize:24.0f];
-	tapLabel.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin;
-	tapLabel.autoresizingMask |= UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin;
-	tapLabel.center = CGPointMake(viewSize.width / 2.0f, viewSize.height / 2.0f);
-
-	[self.view addSubview:tapLabel]; 
-
-	UITapGestureRecognizer *singleTap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleSingleTap:)];
-	//singleTap.numberOfTouchesRequired = 1; singleTap.numberOfTapsRequired = 1; //singleTap.delegate = self;
-	[self.view addGestureRecognizer:singleTap]; 
+    
+	NSString *phrase = nil; // Document password (for unlocking most encrypted PDF files)
+    
+	NSString *filePath = [[NSBundle mainBundle] pathForResource:@"pdf" ofType:@"pdf"]; assert(filePath != nil); // Path to last PDF file
+    
+	ReaderDocument *document = [ReaderDocument withDocumentFilePath:filePath password:phrase];
+    
+	if (document != nil) // Must have a valid ReaderDocument object in order to proceed with things
+	{
+		ReaderViewController *readerViewController = [[ReaderViewController alloc] initWithReaderDocument:document];
+        
+		readerViewController.delegate = self; // Set the ReaderViewController delegate to self
+        
+        [self addChildViewController:readerViewController];
+        CGRect f = self.view.bounds;
+        readerViewController.view.frame = f;
+        [self.view addSubview:readerViewController.view];
+        [readerViewController didMoveToParentViewController:self];
+	}
 }
 
 - (void)viewWillAppear:(BOOL)animated
@@ -164,39 +162,6 @@
 #endif
 
 	[super didReceiveMemoryWarning];
-}
-
-#pragma mark UIGestureRecognizer methods
-
-- (void)handleSingleTap:(UITapGestureRecognizer *)recognizer
-{
-	NSString *phrase = nil; // Document password (for unlocking most encrypted PDF files)
-
-	NSArray *pdfs = [[NSBundle mainBundle] pathsForResourcesOfType:@"pdf" inDirectory:nil];
-
-	NSString *filePath = [pdfs lastObject]; assert(filePath != nil); // Path to last PDF file
-
-	ReaderDocument *document = [ReaderDocument withDocumentFilePath:filePath password:phrase];
-
-	if (document != nil) // Must have a valid ReaderDocument object in order to proceed with things
-	{
-		ReaderViewController *readerViewController = [[ReaderViewController alloc] initWithReaderDocument:document];
-
-		readerViewController.delegate = self; // Set the ReaderViewController delegate to self
-
-#if (DEMO_VIEW_CONTROLLER_PUSH == TRUE)
-
-		[self.navigationController pushViewController:readerViewController animated:YES];
-
-#else // present in a modal view controller
-
-		readerViewController.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
-		readerViewController.modalPresentationStyle = UIModalPresentationFullScreen;
-
-		[self presentViewController:readerViewController animated:YES completion:NULL];
-
-#endif // DEMO_VIEW_CONTROLLER_PUSH
-	}
 }
 
 #pragma mark ReaderViewControllerDelegate methods

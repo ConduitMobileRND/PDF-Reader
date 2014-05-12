@@ -44,10 +44,6 @@
 
 	UIScrollView *theScrollView;
 
-	ReaderMainToolbar *mainToolbar;
-
-	ReaderMainPagebar *mainPagebar;
-
 	NSMutableDictionary *contentViews;
 
 	UIPrintInteractionController *printInteraction;
@@ -129,16 +125,15 @@
 
 - (void)updateToolbarBookmarkIcon
 {
-	NSInteger page = [document.pageNumber integerValue];
-
-	BOOL bookmarked = [document.bookmarks containsIndex:page];
-
-	[mainToolbar setBookmarkState:bookmarked]; // Update
 }
 
-- (void)showDocumentPage:(NSInteger)page
+- (void)showDocumentPage:(NSInteger)page {
+    [self showDocumentPage:page force:false];
+}
+
+- (void)showDocumentPage:(NSInteger)page force:(bool)force
 {
-	if (page != currentPage) // Only if different
+	if (page != currentPage || force) // Only if different
 	{
 		NSInteger minValue; NSInteger maxValue;
 		NSInteger maxPage = [document.pageCount integerValue];
@@ -261,7 +256,7 @@
 
 		newPageSet = nil; // Release new page set
 
-		[mainPagebar updatePagebar]; // Update the pagebar display
+		[_mainPagebar updatePagebar]; // Update the pagebar display
 
 		[self updateToolbarBookmarkIcon]; // Update bookmark
 
@@ -313,7 +308,7 @@
 
 	assert(document != nil); // Must have a valid ReaderDocument
 
-	self.view.backgroundColor = [UIColor grayColor]; // Neutral gray
+	self.view.backgroundColor = [UIColor blackColor];
 
 	CGRect scrollViewRect = self.view.bounds; UIView *fakeStatusBar = nil;
 
@@ -341,18 +336,12 @@
 	theScrollView.backgroundColor = [UIColor clearColor]; theScrollView.delegate = self;
 	[self.view addSubview:theScrollView];
 
-	CGRect toolbarRect = scrollViewRect; // Toolbar frame
-	toolbarRect.size.height = TOOLBAR_HEIGHT; // Default toolbar height
-	mainToolbar = [[ReaderMainToolbar alloc] initWithFrame:toolbarRect document:document]; // ReaderMainToolbar
-	mainToolbar.delegate = self; // ReaderMainToolbarDelegate
-	[self.view addSubview:mainToolbar];
-
 	CGRect pagebarRect = self.view.bounds;; // Pagebar frame
 	pagebarRect.origin.y = (pagebarRect.size.height - PAGEBAR_HEIGHT);
 	pagebarRect.size.height = PAGEBAR_HEIGHT; // Default pagebar height
-	mainPagebar = [[ReaderMainPagebar alloc] initWithFrame:pagebarRect document:document]; // ReaderMainPagebar
-	mainPagebar.delegate = self; // ReaderMainPagebarDelegate
-	[self.view addSubview:mainPagebar];
+	self.mainPagebar = [[ReaderMainPagebar alloc] initWithFrame:pagebarRect document:document]; // ReaderMainPagebar
+	_mainPagebar.delegate = self; // ReaderMainPagebarDelegate
+	[self.view addSubview:_mainPagebar];
 
 	if (fakeStatusBar != nil) [self.view addSubview:fakeStatusBar]; // Add status bar background view
 
@@ -428,7 +417,7 @@
 	NSLog(@"%s", __FUNCTION__);
 #endif
 
-	mainToolbar = nil; mainPagebar = nil;
+	self.mainPagebar = nil;
 
 	theScrollView = nil; contentViews = nil; lastHideTime = nil;
 
@@ -471,27 +460,29 @@
 	lastAppearSize = CGSizeZero; // Reset view size tracking
 }
 
-/*
+
 - (void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation
 {
-	//if (isVisible == NO) return; // iOS present modal bodge
+	if (isVisible == NO) return; // iOS present modal bodge
 
-	//if (fromInterfaceOrientation == self.interfaceOrientation) return;
+	if (fromInterfaceOrientation == self.interfaceOrientation) return;
+    
+    [self showDocumentPage:currentPage force:YES];
 }
-*/
+
 
 - (void)didReceiveMemoryWarning
 {
-#ifdef DEBUG
-	NSLog(@"%s", __FUNCTION__);
-#endif
-
 	[super didReceiveMemoryWarning];
 }
 
 - (void)dealloc
 {
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
+    
+	[document saveReaderDocument]; // Save any ReaderDocument object changes
+	[[ReaderThumbQueue sharedInstance] cancelOperationsWithGUID:document.guid];
+	[[ReaderThumbCache sharedInstance] removeAllObjects]; // Empty the thumb cache
 }
 
 #pragma mark UIScrollViewDelegate methods
@@ -636,9 +627,9 @@
 			{
 				if ([lastHideTime timeIntervalSinceNow] < -0.75) // Delay since hide
 				{
-					if ((mainToolbar.hidden == YES) || (mainPagebar.hidden == YES))
+					if ((_mainPagebar.hidden == YES))
 					{
-						[mainToolbar showToolbar]; [mainPagebar showPagebar]; // Show
+						[_mainPagebar showPagebar]; // Show
 					}
 				}
 			}
@@ -722,7 +713,7 @@
 
 - (void)contentView:(ReaderContentView *)contentView touchesBegan:(NSSet *)touches
 {
-	if ((mainToolbar.hidden == NO) || (mainPagebar.hidden == NO))
+	if ((_mainPagebar.hidden == NO))
 	{
 		if (touches.count == 1) // Single touches only
 		{
@@ -735,7 +726,7 @@
 			if (CGRectContainsPoint(areaRect, point) == false) return;
 		}
 
-		[mainToolbar hideToolbar]; [mainPagebar hidePagebar]; // Hide
+		[_mainPagebar hidePagebar]; // Hide
 
 		lastHideTime = [NSDate date];
 	}
@@ -871,22 +862,13 @@
 
 - (void)tappedInToolbar:(ReaderMainToolbar *)toolbar markButton:(UIButton *)button
 {
-	if (printInteraction != nil) [printInteraction dismissAnimated:YES];
-
-	NSInteger page = [document.pageNumber integerValue];
-
-	if ([document.bookmarks containsIndex:page]) // Remove bookmark
-	{
-		[mainToolbar setBookmarkState:NO]; [document.bookmarks removeIndex:page];
-	}
-	else // Add the bookmarked page index to the bookmarks set
-	{
-		[mainToolbar setBookmarkState:YES]; [document.bookmarks addIndex:page];
-	}
+	if (printInteraction != nil)
+        [printInteraction dismissAnimated:YES];
 }
 
 #pragma mark MFMailComposeViewControllerDelegate methods
 
+#if (READER_ENABLE_MAIL == TRUE) // Option
 - (void)mailComposeController:(MFMailComposeViewController *)controller didFinishWithResult:(MFMailComposeResult)result error:(NSError *)error
 {
 	#ifdef DEBUG
@@ -895,6 +877,7 @@
 
 	[self dismissViewControllerAnimated:YES completion:NULL]; // Dismiss
 }
+#endif // end of READER_ENABLE_MAIL Option
 
 #pragma mark ThumbsViewControllerDelegate methods
 
