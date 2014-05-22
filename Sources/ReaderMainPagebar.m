@@ -60,6 +60,8 @@
 #define PAGE_NUMBER_HEIGHT 30.0f
 #define PAGE_NUMBER_SPACE 20.0f
 
+#define AUTO_HIDE_DELAY    2.0f
+
 #pragma mark Properties
 
 @synthesize delegate;
@@ -197,6 +199,8 @@
 		[self updatePageNumberText:[document.pageNumber integerValue]];
 
 		miniThumbViews = [NSMutableDictionary new]; // Small thumbs
+        
+        [self autohide];
 	}
 
 	return self;
@@ -355,7 +359,14 @@
 			}
 			completion:NULL
 		];
+        
+        [self autohide];
 	}
+}
+
+- (void)autohide {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(hidePagebar) object:nil];
+    [self performSelector:@selector(hidePagebar) withObject:nil afterDelay:AUTO_HIDE_DELAY];
 }
 
 #pragma mark ReaderTrackControl action methods
@@ -368,6 +379,8 @@
 	{
 		[delegate pagebar:self gotoPage:trackControl.tag]; // Go to document page
 	}
+    
+    [self autohide];
 }
 
 - (void)enableTimerFired:(NSTimer *)timer
@@ -416,6 +429,8 @@
 	}
 
 	trackView.tag = page; // Start page tracking
+    
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(hidePagebar) object:nil];
 }
 
 - (void)trackViewValueChanged:(ReaderTrackControl *)trackView
@@ -448,6 +463,8 @@
 	}
 
 	trackView.tag = 0; // Reset page tracking
+    
+    [self autohide];
 }
 
 @end
