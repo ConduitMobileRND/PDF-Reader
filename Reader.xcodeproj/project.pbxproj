@@ -1036,6 +1036,7 @@
 				158BDB2B1920C97D005337CB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		158BDB301920C97D005337CB /* Build configuration list for PBXNativeTarget "pdfreaderTests" */ = {
 			isa = XCConfigurationList;
@@ -1045,6 +1046,7 @@
 				158BDB2E1920C97D005337CB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		1D6058960D05DD3E006BFB54 /* Build configuration list for PBXNativeTarget "Reader" */ = {
 			isa = XCConfigurationList;
